@@ -1,0 +1,375 @@
+###  code to check the range maps 
+
+## we received the decision from SA and the alpha-hull range maps were the most questioned. We thus will do more 
+## validation steps.
+
+## the main work considering the revision will be:
+# 1)	External validation: using range maps (EU-Forest and "little maps"), and plot data (forestplots). 
+### I am wondering that this shall not be that helpful, as the EU and America are also two continents well 
+##  sampled in GBIF and BIEN database. Nonetheless, let's see.
+# 2)	Method validation: MCP (Pep helps, thanks!), and then check the richness maps from MCP and alpha-hull.
+# 3)	Consistence check: divide the world into well-sampled and poor-sampled areas, and run the same analysis to the well-sampled area to check the priority rankings. The question here is do we have a standard for this division? 
+# 4)	Trait dimensions: I am thinking probably we don't need to rerun a new analysis without trait inputs, as current Fig. 1 already shows it contributes some but not many. We probably only need to discuss this a little more.
+# 5)	Adding new results suggested by Jens;
+# 6)	Text: change the angle to tree ecosystem rather than only tree species;  in the introduction, adding info about the necessity of using more dimensions to fully capture the high priority areas; in the discussion, adding info about the limitation of the data.
+
+# Jens also mentioned:
+#It's important to describe the methods and data in more detail, so all our efforts there get appreciated.
+# Re 6 - I actually changed my mind. Given the analyses, I think we should focus more on the species (+lineage + trait) conservation aspect. 
+# As it is we discuss tree biodiversity a lot and it's maybe not super clear what we are referring to.
+
+## here, I will start the external validation
+## 1) using range maps (EU-forest and "little maps")
+
+## a  EU-forest https://www.nature.com/articles/sdata2016123  ####################
+## there are 203 species with alpha-hulls
+  
+## obtain the species list of EU-forest
+setwd("D:/Wenyong/2_WDPA_3D/ext_validation/EU_forest_EOOs")
+
+#save.image("D:/Wenyong/2_WDPA_3D/analysis/external_validation_EU_forest_26June2020.RData")
+load("D:/Wenyong/2_WDPA_3D/analysis/external_validation_EU_forest_26June2020.RData")
+#--store shapefile names as a list
+eu_forest_sp<- list.files("./shapefiles_hull", pattern = "\\.shp$", full.names = T)
+
+#--inspect list
+summary(eu_forest_sp)  ## it is true, there is only 39081 shp files (species)
+
+write.csv(eu_forest_sp, file = "eu_forest_sp.csv")  ##for check
+
+eu_forest_sp_clean <- read.csv("eu_forest_sp_clean.csv", header = T, sep = ';')
+
+
+## generate the species list for species with a range/distribution shp file
+
+#--store shapefile names as a list
+TC_shp_files6 <- list.files("D:/Wenyong/ahull_all/ahull_range_6Modif", pattern = "\\.shp$")
+
+#--inspect list
+summary(TC_shp_files6)  ## it is true, there is only 39081 shp files (species)
+
+write.csv(TC_shp_files6, file = "shp.a_hull6_list.csv")  ##for check
+TC_shp_files6_clean <- read.csv("D:/Wenyong/2_WDPA_3D/ext_validation/EU_forest_EOOs/shp.a_hull6_list_clean.csv", header = T, sep = ';')
+
+library(dplyr)
+eu_forest_sp_clean_match <- left_join(eu_forest_sp_clean, TC_shp_files6_clean, by = "species")
+## totally there are 26 species missing from our data, that is, 203-26 = 177 shared species.
+write.csv(eu_forest_sp_clean_match, file = "eu_forest_sp_clean_match.csv")
+library(raster)
+
+##### I then used ArcGIS to prepre the file by merging all the species existing in both TC data and EU-Forest data.
+## notice: as EU-forest includes tree species which EU are the alien ranges, on the other hand, our TC data only inlcudes
+###  native range, I thus removed the alien species from the EU-Forest dataset. There are 137 species left.
+
+EU_TC_clip <- rgdal::readOGR(dsn =  "D:/Wenyong/2_WDPA_3D/ext_validation/EU_forest_EOOs", layer = "EU_TC_Clip")
+EU_TC_clip
+
+print(bbox(EU_TC_clip), digits=12)
+
+colnames(EU_TC_clip@data) <- "binomial"
+
+# ##prepare and plot the range map in a colorful way
+ colors <- rainbow(length(unique(EU_TC_clip@data$binomial)),
+                   alpha = 0.5)
+ position_6mod <- match(EU_TC_clip@data$binomial,
+                       unique(EU_TC_clip@data$binomial))
+ colors <- colors[position_6mod]
+ plot(EU_TC_clip, col = colors, lty = 0,
+      main = "Spatial polygons ofEU-TC-clip")
+map(add = TRUE)
+
+## using letsR to rasterize the layer with 1 degree resolution
+EU_TC_clip_mod <- lets.presab(EU_TC_clip, xmn = -18, xmx = 34, ymn = 26, ymx = 71,resol = 1, 
+                             remove.cells = TRUE, remove.sp = TRUE, show.matrix = FALSE,count = TRUE,   ##count = T to keep track of the analysis relative running time
+                             crs = CRS("+proj=longlat +datum=WGS84"))
+
+summary(EU_TC_clip_mod)  ### summary the presence-absence matrix
+plot(EU_TC_clip_mod, main = "TC Species Richness")
+
+library(ecospat)
+
+EU_TC_overlap <- ecospat.co_occurrences (EU_TC_clip_mod$Presence_and_Absence_Matrix[, -c(1:2)])
+
+## change the similarity matrix into pariwise combination
+library(reshape)
+m <- as.matrix(EU_TC_overlap)
+m2 <- melt(m)[melt(upper.tri(m))$value,]
+names(m2) <- c("c1", "c2", "similarity")
+m3 <- gsub("_my", "", m2$c1)
+m3_2 <- gsub("_my", "", m2$c2)
+m4 <- as.data.frame(cbind(m3, m3_2, m2$similarity))
+##select the same species existing in both datasets
+EU_TC_overlap_same_sp <- m4[m4$m3==m4$m3_2, ]
+#write.csv(EU_TC_overlap_same_sp, file = "EU_TC_overlap_same_sp.csv")
+str(EU_TC_overlap_same_sp)
+EU_TC_overlap_same_sp$V3 <- as.numeric(EU_TC_overlap_same_sp$V3)
+hist(as.numeric(EU_TC_overlap_same_sp$V3))
+
+
+
+
+
+############ validatio with Sandel et al. 2020 GEB paper  #############
+
+setwd("D:/Wenyong/2_WDPA_3D/ext_validation")
+dir()
+
+
+all_shapes_467526mod <- rgdal::readOGR(dsn =  "D:/Wenyong/universal_scripts_data", layer = "TC_sum6_46752sp_07Apr2020")
+all_shapes_467526mod
+
+print(bbox(all_shapes_467526mod), digits=12)
+set_ll_warn(FALSE) 
+set_ll_TOL(0.2) 
+# then, the further analysis will keep runing and leave the warning alone.
+
+#all_shapes_6mod <- spTransform(all_shapes_6mod, CRSobj = WGS84) # don't change now
+st_crs(all_shapes_467526mod)
+
+colnames(all_shapes_467526mod@data) <- "binomial"
+
+# ##prepare and plot the range map in a colorful way
+# colors <- rainbow(length(unique(all_shapes_6mod@data$binomial)),
+#                   alpha = 0.5)
+# position_6mod <- match(all_shapes_6mod@data$binomial,
+#                        unique(all_shapes_6mod@data$binomial))
+# colors <- colors[position_6mod]
+# plot(all_shapes_6mod, col = colors, lty = 0,
+#      main = "Spatial polygons of ahull6 EUROFGEN modified")
+# map(add = TRUE)
+
+## check the geometry
+gIsValid(all_shapes_467526mod)
+sum(gIsValid(all_shapes_467526mod, byid=TRUE)==FALSE)
+all_shapes_6mod_checked <- gBuffer(all_shapes_467526mod, byid=TRUE, width=0)
+
+
+### above script get an distribution map of all 46767 species
+
+## using the glonaf_v2 shapefile
+gift_tree_SR <- rgdal::readOGR(dsn =  "D:/Wenyong/2_WDPA_3D/ext_validation/doi_10.5061_dryad.jn07s0s__v1/Tree_PE", layer = "Tree_PE")
+plot(gift_tree_SR)
+summary(gift_tree_SR)
+gift_tree_SR <-   spTransform(gift_tree_SR, CRSobj = CRS(proj4string(all_shapes_467526mod)))
+
+gIsValid(gift_tree_SR, byid=TRUE)
+gIsValid(gift_tree_SR)
+
+# this is a well known R / GEOS hack (usually combined with the above) to 
+# deal with "bad" polygons
+gift_tree_SR <- gBuffer(gift_tree_SR, byid=TRUE, width=0)
+
+# any bad polys?
+sum(gIsValid(gift_tree_SR, byid=TRUE)==FALSE)
+
+# Select only the elements of grid that intersect glonaf
+all_shapes_6mod_glonaf <- all_shapes_6mod_checked[gift_tree_SR,]
+
+# Count the number of elements from tree species layers that fall within each glonaf level 4 zones
+## i.e., species richness 
+gift_tree_SR@data$count_tree <- unlist(over(x =gift_tree_SR ,y=all_shapes_6mod_glonaf[,"binomial"],fn="length"))
+
+
+# Export
+#writeOGR(obj=glonaf_v2,dsn="glonaf_v2_tree_no.shp",layer="glonaf_v2",driver="ESRI Shapefile",overwrite_layer = T)
+
+
+## then obtain the presence-absence matrix
+
+projection(all_shapes_6mod_checked) <- projection(gift_tree_SR)
+
+## using letsR to rasterize the layer using GloNAF level 4
+PAMAhull_tree_SR <- lets.presab.grid(all_shapes_6mod_checked, gift_tree_SR, "ID")  ### all tree species
+# To plot the richness map
+rich_plus1 <- rowSums(PAMAhull_tree_SR$PAM) + 1
+colfunc <- colorRampPalette(c("#fff5f0", "#fb6a4a", "#67000d"))
+colors <- c("white", colfunc(max(rich_plus1)))
+plot(PAMAhull_tree_SR$grid, border = "gray40",
+     col = colors[rich_plus1])
+map(add = TRUE)
+
+
+summary(PAMAhull_tree_SR)  ### summary the presenc
+
+PAMAhull_tree_SR_df <- PAMAhull_tree_SR$grid@data
+
+plot(PAMAhull_tree_SR_df$S ~ rich_plus1)
+abline(lm(PAMAhull_tree_SR_df$S ~ rich_plus1))
+summary(lm(PAMAhull_tree_SR_df$S ~ rich_plus1))
+
+
+reg1 <- lm(log10(PAMAhull_tree_SR_df$S) ~ log10(rich_plus1))
+
+resid.reg1 <- resid(reg1)
+plot(resid(reg1))
+write.csv(resid.reg1, file = "residual_SR.csv") ## export it and use ArcGis to plot the residual
+
+PAMAhull_tree_SR_df<- cbind(PAMAhull_tree_SR_df, rich_plus1)
+
+
+
+library(ggplot2)
+ggplot(PAMAhull_tree_SR_df, aes(x= rich_plus1, y= S)) +
+  geom_point(shape=1) +    # Use hollow circles
+  geom_abline(slope=1) +
+  geom_smooth(method=lm) +
+    scale_x_continuous(expand = c(0, 0), limits = c(0,3500)) + scale_y_continuous(expand = c(0, 0), limits = c(0,3500)) +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        #strip.background = element_rect(colour="white", fill="white"),
+        text = element_text(size = 16),
+        legend.position = "none") +
+  ylab("Species richness (Sandel et al. 2020)") +
+  xlab("Species richness (Observed)")
+
+pdf("Fig.SXX sr_sandel_vs_TC_regression_03July2020.pdf", useDingbats=FALSE, width=8, height=8)
+
+
+dev.off()
+
+
+##obtain the PD and compare with Sandel's result. However, I don't think it makes sense, as the phylogenies we used are different too.
+# tree <- read.tree("D:/Wenyong/TCshare/phylotree/TC_tree_v5_tree.tre")
+# tree$root.edge <- 0
+# is.rooted(tree)
+# value <- which(tree$tip.label %in% PAMAhull_tree_SR$Species_name)
+# sps <- tree$tip.label[value]
+# library(picante)
+# ## calculate PD using pincante
+# tc_pd_picante <- pd(PAMAhull_tree_SR$PAM[, -c(1:2)], tree, include.root=TRUE)
+# 
+# 
+# ## assign PD to the raster
+# tree.pam_new_pd[id] <- tc_pd_picante[,1]
+# plot(tree.pam_new_pd)
+# names(tc_pd_picante)[1] <- "PD_TC"
+# names(tc_pd_picante)[2] <- "SR"
+# 
+# PAMAhull_tree_SR_PD_df<- cbind(PAMAhull_tree_SR_df, tc_pd_picante)
+# str(PAMAhull_tree_SR_PD_df)
+# ##plot
+# ggplot(PAMAhull_tree_SR_PD_df, aes(x=PD, y=PD_TC)) +
+#   geom_point(shape=1) +    # Use hollow circles
+#   geom_abline(slope=1) +
+#   geom_smooth(method=lm) +
+#   #scale_x_continuous(expand = c(0, 0), limits = c(0,3500)) + scale_y_continuous(expand = c(0, 0), limits = c(0,3500)) +
+#   theme_bw() +
+#   theme(panel.grid.major = element_blank(),
+#         panel.grid.minor = element_blank(),
+#         #strip.background = element_rect(colour="white", fill="white"),
+#         text = element_text(size = 16),
+#         legend.position = "none") +
+#   ylab("Phylogenetic diversity (Observed) ") +
+#   xlab("Phylogenetic diversity (Sandel et al. 2020)")
+
+
+
+#### little maps   ######
+library(dplyr)
+little_map_sp <- read.csv("D:/Wenyong/2_WDPA_3D/ext_validation/little_maps/little_maps.csv", header = T, sep =';')
+little_map_sp_match <- left_join(little_map_sp, TC_shp_files6_clean, by = "species")
+summary(little_map_sp_match)
+write.csv(little_map_sp_match, file = "little_map_sp_match.csv")
+
+
+
+Little_datatable_clean <- read.csv("D:/Wenyong/2_WDPA_3D/ext_validation/little_maps/Little_datatable_clean.csv", header = T, sep =';')
+Little_datatable_clean_match <- left_join(Little_datatable_clean, little_map_sp_match, by = "species")
+str(Little_datatable_clean_match)
+write.csv(Little_datatable_clean_match, file = "D:/Wenyong/2_WDPA_3D/ext_validation/little_maps/Little_datatable_clean_match.csv")
+
+
+## then I use ArcGIS to prepare the files.
+
+## got the final merged file, and repeat the steps as the EU-forest data
+
+
+little_TC_clip <- rgdal::readOGR(dsn =  "D:/Wenyong/2_WDPA_3D/ext_validation/little_maps", layer = "Merged_little_TC_map_Clip")
+little_TC_clip
+
+print(bbox(little_TC_clip), digits=12)
+
+colnames(little_TC_clip@data) <- "binomial"
+
+# ##prepare and plot the range map in a colorful way
+colors <- rainbow(length(unique(little_TC_clip@data$binomial)),
+                  alpha = 0.5)
+position_6mod_lt <- match(little_TC_clip@data$binomial,
+                       unique(little_TC_clip@data$binomial))
+colors <- colors[position_6mod_lt]
+plot(little_TC_clip, col = colors, lty = 0,
+     main = "Spatial polygons of Little-TC-clip")
+map(add = TRUE)
+
+## using letsR to rasterize the layer with 1 degree resolution
+little_TC_clip_mod <- lets.presab(little_TC_clip, xmn = -169, xmx = -15, ymn = 6, ymx = 75,resol = 1, 
+                              remove.cells = TRUE, remove.sp = TRUE, show.matrix = FALSE,count = TRUE,   ##count = T to keep track of the analysis relative running time
+                              crs = CRS("+proj=longlat +datum=WGS84"))
+
+summary(little_TC_clip_mod)  ### summary the presence-absence matrix
+plot(little_TC_clip_mod, main = "Little TC Species Richness")
+
+library(ecospat)
+
+Little_TC_overlap <- ecospat.co_occurrences (little_TC_clip_mod$Presence_and_Absence_Matrix[, -c(1:2)])
+
+## change the similarity matrix into pariwise combination
+library(reshape)
+m_little <- as.matrix(Little_TC_overlap)
+m2_little <- melt(m_little)[melt(upper.tri(m_little))$value,]
+names(m2_little) <- c("c1", "c2", "similarity")
+m3_little <- gsub("_", " ", m2_little$c1)
+m3_2_little <- gsub("_", " ", m2_little$c2)
+m4_little <- as.data.frame(cbind(m3_little, m3_2_little, m2_little$similarity))
+##select the same species existing in both datasets
+little_TC_overlap_same_sp <- m4_little[m4_little$m3_little==m4_little$m3_2_little, ]
+#write.csv(EU_TC_overlap_same_sp, file = "EU_TC_overlap_same_sp.csv")
+str(little_TC_overlap_same_sp)
+
+## import the two dfs
+ext_validation_EU_forest <- read.csv("D:/Wenyong/2_WDPA_3D/ext_validation/ext_validation_EU_forest.csv", header = T, sep = ';')
+ext_validation_Little_map <- read.csv("D:/Wenyong/2_WDPA_3D/ext_validation/ext_validation_Little_map.csv", header = T, sep = ';')
+ext_validation_EU_forest$group <- "EU-Forest"
+ext_validation_Little_map$group <- "Little maps"
+ext_validation_both <- rbind(ext_validation_EU_forest, ext_validation_Little_map)
+
+hist(ext_validation_EU_forest$v3)
+hist(ext_validation_Little_map$V3)
+
+
+library(plyr)
+mean_v3 <- ddply(ext_validation_both, "group", summarise, grp.mean=mean(v3))
+head(mean_v3)
+
+
+ggplot(ext_validation_both, aes(x=v3, color=group)) +
+   #geom_density()+
+ # geom_histogram(aes(y=..density..), binwidth = 0.05, fill="white", alpha=0.5, position="dodge") +
+  stat_ecdf() +
+  geom_vline(data=mean_v3, aes(xintercept=grp.mean, color=group),
+             linetype="dashed")+
+  # geom_freqpoly(aes(x=ratio, linetype = group),binwidth = 0.1) +
+ # geom_freqpoly(binwidth = 0.05) +
+  #geom_histogram(binwidth = 0.05) +
+  # geom_vline(data=mu3, aes(xintercept=grp.mean, color=group),
+  #            linetype="dashed") +
+   scale_x_continuous(expand = c(0, 0), limits = c(0,1))  +scale_y_continuous(expand = c(0, 0), limits = c(0,1)) + 
+  #scale_color_brewer(palette="Dark2")+
+  scale_color_brewer(palette="Set1")+
+  #scale_color_viridis(discrete=TRUE, option = "D") +
+  theme_classic() +
+  stat_ecdf(aes(color = group,linetype = group), 
+            geom = "step", size = 1.5) +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        #strip.background = element_rect(colour="white", fill="white"),
+        text = element_text(size = 16),
+        legend.position = c(0.1,0.8)) +
+   ylab("Cumulative percentage") +
+   xlab("Species co-occurrence index")
+
+pdf("D:/Wenyong/2_WDPA_3D/analysis/Fig.ext_validatoin_both.pdf", useDingbats=FALSE, width=8, height=8)
+
+dev.off()
+
