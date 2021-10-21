@@ -1,24 +1,8 @@
 ###  code to check the range maps 
 
-## we received the decision from SA and the alpha-hull range maps were the most questioned. We thus will do more 
-## validation steps.
+## 	External validation: using range maps (EU-Forest and "little maps"), and plot data (forestplots). 
 
-## the main work considering the revision will be:
-# 1)	External validation: using range maps (EU-Forest and "little maps"), and plot data (forestplots). 
-### I am wondering that this shall not be that helpful, as the EU and America are also two continents well 
-##  sampled in GBIF and BIEN database. Nonetheless, let's see.
-# 2)	Method validation: MCP (Pep helps, thanks!), and then check the richness maps from MCP and alpha-hull.
-# 3)	Consistence check: divide the world into well-sampled and poor-sampled areas, and run the same analysis to the well-sampled area to check the priority rankings. The question here is do we have a standard for this division? 
-# 4)	Trait dimensions: I am thinking probably we don't need to rerun a new analysis without trait inputs, as current Fig. 1 already shows it contributes some but not many. We probably only need to discuss this a little more.
-# 5)	Adding new results suggested by Jens;
-# 6)	Text: change the angle to tree ecosystem rather than only tree species;  in the introduction, adding info about the necessity of using more dimensions to fully capture the high priority areas; in the discussion, adding info about the limitation of the data.
-
-# Jens also mentioned:
-#It's important to describe the methods and data in more detail, so all our efforts there get appreciated.
-# Re 6 - I actually changed my mind. Given the analyses, I think we should focus more on the species (+lineage + trait) conservation aspect. 
-# As it is we discuss tree biodiversity a lot and it's maybe not super clear what we are referring to.
-
-## here, I will start the external validation
+## here, start the external validation
 ## 1) using range maps (EU-forest and "little maps")
 
 ## a  EU-forest https://www.nature.com/articles/sdata2016123  ####################
